@@ -6,51 +6,66 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
-
 import android.os.Build;
-import android.os.Handler;
 import android.os.IBinder;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
-import android.widget.Toast;
+
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.Timer;
+import java.util.TimerTask;
 
 
 /**
- * Created by molot on 17.10.2017.
+ * Created by Astar on 17.10.2017.
  */
 
 public class GeoGetService extends Service {
 
-    private NotificationManager notificationManager;
-    private MyLocation myLocation;
-    public static final int DEFAULT_NOTIFICATION_ID =  101;
+    public static final String TAG = "Main Activity";
+
+    public static final String SERVER_NAME = "http://rrogea75.siteme.org/geo_service.php?";
+    public static final int USER_ID = 2;
+    public static final int DEFAULT_NOTIFICATION_ID = 101;
     public static final int RESTART_SERVICE_SECONDS = 3000;
 
+    private NotificationManager notificationManager;
+    private MyLocation myLocation;
 
     @Override
     public void onCreate() {
         super.onCreate();
-        myLocation = new MyLocation(getApplicationContext());
-        notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-
     }
+
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        sendNotification("Ticker", "Title", "Text");
-        Log.d("GeoGetService", "onStartCommand");
+        notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        myLocation = new MyLocation(getApplicationContext());
+        myLocation.removeListener();
+        myLocation.reloadListener();
+
+        sendNotification("", "", "");
+
+        if (myLocation != null) {
+            myLocation.removeListener();
+            myLocation.reloadListener();
+        }
+
         doTask();
 
         return START_REDELIVER_INTENT;
     }
 
     public void sendNotification(String ticker, String title, String text) {
-        Log.d("GeoGetService", "sendNotification");
         Intent notificationIntent = new Intent(this, MainActivity.class);
         notificationIntent.setAction(Intent.ACTION_MAIN);
         notificationIntent.addCategory(Intent.CATEGORY_LAUNCHER);
 
-        PendingIntent contentIntent = PendingIntent.getActivity(getApplicationContext(), 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);;
+        PendingIntent contentIntent = PendingIntent.getActivity(getApplicationContext(), 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this);
         builder.setContentIntent(contentIntent)
@@ -79,8 +94,12 @@ public class GeoGetService extends Service {
 
     @Override
     public void onTaskRemoved(Intent rootIntent) {
-        Log.d("GeoGetService", "onTaskRemoved");
         super.onTaskRemoved(rootIntent);
+        myLocation.removeListener();
+        restartApp();
+    }
+
+    private void restartApp() {
         Intent intentService = new Intent(this, getClass());
         AlarmManager am = (AlarmManager) getSystemService(ALARM_SERVICE);
         PendingIntent pi = PendingIntent.getService(this, 1, intentService, PendingIntent.FLAG_ONE_SHOT);
@@ -89,27 +108,46 @@ public class GeoGetService extends Service {
 
     @Override
     public void onDestroy() {
-        Log.d("GeoGetService", "onDestroy");
         super.onDestroy();
         notificationManager.cancel(DEFAULT_NOTIFICATION_ID);
         stopSelf();
     }
 
     private void doTask() {
-        Log.d("GeoGetService", "doTask");
-
-        final Handler handler = new Handler();
-        handler.post(new Runnable() {
+        Timer timer = new Timer();
+        timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                // код отправки данных на сервер...
+                HttpURLConnection connection = null;
+                try {
+                    LatLng latLng = myLocation.getLocation();
+                    String urlPost = SERVER_NAME + "action=put&user_id=" + USER_ID + "&"
+                            + "latitude=" + latLng.getLatitude() + "&"
+                            + "longitude=" + latLng.getLongitude();
 
-                // ...
+                    Log.d(TAG, urlPost);
 
-                Toast.makeText(getApplicationContext(), myLocation.getLocationData(), Toast.LENGTH_SHORT).show();
-                handler.postDelayed(this, 3000);
+                    URL url = new URL(urlPost);
+                    connection = (HttpURLConnection) url.openConnection();
+                    connection.setRequestMethod("GET");
+                    connection.setConnectTimeout(8000);
+                    connection.connect();
+
+                    if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                        Log.d(TAG, "" + connection.getResponseCode());
+                    }
+                } catch (MalformedURLException e) {
+                    restartApp();
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    restartApp();
+                    e.printStackTrace();
+                } finally {
+                    if (connection != null)
+                        connection.disconnect();
+                }
             }
-        });
+        }, 0, 10000);
     }
 
 }

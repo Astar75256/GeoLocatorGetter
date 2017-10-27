@@ -5,13 +5,15 @@ import android.content.Context;
 import android.content.Intent;
 
 /**
- * Created by molot on 20.10.2017.
+ * Created by Astar on 20.10.2017.
  */
 
 public class MyReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
-        Intent intentService = new Intent(context, GeoGetService.class);
-        context.startService(intentService);
+        if (!Util.isMyServiceRunning(context, GeoGetService.class)) {
+            Intent intentService = new Intent(context, GeoGetService.class);
+            context.startService(intentService);
+        }
     }
 }

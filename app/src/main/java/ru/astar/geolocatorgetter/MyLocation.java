@@ -8,67 +8,97 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
-import android.widget.Toast;
+import android.util.Log;
 
-public class MyLocation implements LocationListener {
+/**
+ * Created by Astar on 20.10.2017.
+ */
+
+public class MyLocation {
+
+    public static final String TAG = "My Location";
+
+    private LocationManager locationManager;
 
     private Context context;
-    private LocationManager manager;
-    private String latitude, longitude;
+    private LatLng latLng;
+
 
     public MyLocation(Context context) {
         this.context = context;
-        this.manager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
-        manager.removeUpdates(this);
-        checkPermission();
-        manager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 3000, 10, this);
-        manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 3000, 10, this);
+        latLng = new LatLng(0, 0);
+        reloadListener();
     }
 
-    private void checkPermission() {
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
-            Toast.makeText(context, "Не могу получить геоданные...", Toast.LENGTH_LONG).show();
+    public void reloadListener() {
+        if (ActivityCompat.checkSelfPermission(this.context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this.context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
+
+        locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 3000L, 15, locationListener);
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 3000L, 15, locationListener);
     }
 
-    public String getLocationData() {
-        if (latitude == "null" || longitude == "null") {
-            checkPermission();
-            Location location = manager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-            if (location != null) {
-                latitude = String.valueOf(location.getLatitude());
-                longitude = String.valueOf(location.getLongitude());
+    public void removeListener() {
+        locationManager.removeUpdates(locationListener);
+    }
+
+    public LatLng getLocation() {
+        LatLng latLng = this.latLng;
+
+        if (latLng == null || latLng.getLatitude() == 0 || latLng.getLongitude() == 0) {
+
+            if (ActivityCompat.checkSelfPermission(this.context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this.context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                return latLng;
+            }
+
+            Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+
+            if (location == null) {
+                location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+            }
+
+            double latitude;
+            double longitude;
+
+            try {
+                latitude = location.getLatitude();
+                longitude = location.getLongitude();
+            } catch (NullPointerException e) {
+                Log.d(TAG, "" + e.getMessage());
+                latitude = 0;
+                longitude = 0;
+            }
+
+            if (latitude == 0 || longitude == 0) {
+                latLng = new LatLng(latitude, longitude);
             }
         }
-        return "Широта = " + latitude + "; Долгота = " + longitude;
+
+        return latLng;
     }
 
-    @Override
-    public void onLocationChanged(Location location) {
-        latitude = String.valueOf(location.getLatitude());
-        longitude = String.valueOf(location.getLongitude());
-    }
+    private LocationListener locationListener = new LocationListener() {
+        @Override
+        public void onLocationChanged(Location location) {
+            latLng = new LatLng(location.getLatitude(), location.getLongitude());
+        }
 
-    @Override
-    public void onStatusChanged(String s, int i, Bundle bundle) {
+        @Override
+        public void onStatusChanged(String s, int i, Bundle bundle) {
 
-    }
+        }
 
-    @Override
-    public void onProviderEnabled(String s) {
+        @Override
+        public void onProviderEnabled(String s) {
 
-    }
+        }
 
-    @Override
-    public void onProviderDisabled(String s) {
+        @Override
+        public void onProviderDisabled(String s) {
 
-    }
+        }
+    };
+
 }
