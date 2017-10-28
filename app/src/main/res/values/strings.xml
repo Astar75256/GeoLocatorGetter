@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">GeoLocatorGetter</string>
+    <string name="userid">Введите UserID</string>
 </resources>

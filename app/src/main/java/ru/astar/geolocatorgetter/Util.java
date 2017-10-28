@@ -8,6 +8,11 @@ import android.content.Context;
  */
 
 public class Util {
+
+    public static final String PREF_APP = "GeoGetter";
+    public static final String PREF_FIRST_RUN = "first_run";
+    public static final String PREF_USER_ID = "user_id";
+
     public static boolean isMyServiceRunning(Context context, Class<?> serviceClass) {
         ActivityManager manager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
 

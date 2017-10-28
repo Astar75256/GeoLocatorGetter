@@ -11,8 +11,10 @@ import android.content.Intent;
 public class MyReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
+
+        Intent intentService = new Intent(context, GeoGetService.class);
+
         if (!Util.isMyServiceRunning(context, GeoGetService.class)) {
-            Intent intentService = new Intent(context, GeoGetService.class);
             context.startService(intentService);
         }
     }

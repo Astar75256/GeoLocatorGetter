@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.IBinder;
 import android.support.v4.app.NotificationCompat;
@@ -15,6 +16,7 @@ import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -28,21 +30,32 @@ public class GeoGetService extends Service {
     public static final String TAG = "Main Activity";
 
     public static final String SERVER_NAME = "http://rrogea75.siteme.org/geo_service.php?";
-    public static final int USER_ID = 2;
     public static final int DEFAULT_NOTIFICATION_ID = 101;
     public static final int RESTART_SERVICE_SECONDS = 3000;
 
     private NotificationManager notificationManager;
     private MyLocation myLocation;
+    private SharedPreferences preferences;
+
+    private int userId;
+    private int delaySendQuery;  // время задержки для отправки запроса
 
     @Override
     public void onCreate() {
         super.onCreate();
     }
 
-
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        preferences = getSharedPreferences(Util.PREF_APP, MODE_PRIVATE);
+        if (preferences != null) {
+            if (!preferences.contains(Util.PREF_USER_ID)) stopSelf();
+            userId = preferences.getInt(Util.PREF_USER_ID, 0);
+            if (userId <= 0) stopSelf();
+        }
+
+        delaySendQuery = 10000;
+
         notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         myLocation = new MyLocation(getApplicationContext());
         myLocation.removeListener();
@@ -95,7 +108,7 @@ public class GeoGetService extends Service {
     @Override
     public void onTaskRemoved(Intent rootIntent) {
         super.onTaskRemoved(rootIntent);
-        myLocation.removeListener();
+
         restartApp();
     }
 
@@ -114,16 +127,18 @@ public class GeoGetService extends Service {
     }
 
     private void doTask() {
-        Timer timer = new Timer();
+        final Timer timer = new Timer();
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
                 HttpURLConnection connection = null;
                 try {
                     LatLng latLng = myLocation.getLocation();
-                    String urlPost = SERVER_NAME + "action=put&user_id=" + USER_ID + "&"
+                    int gpsEnabled = (myLocation.isGpsEnabled()) ? 1 : 0;
+                    String urlPost = SERVER_NAME + "action=put&user_id=" + userId + "&"
                             + "latitude=" + latLng.getLatitude() + "&"
-                            + "longitude=" + latLng.getLongitude();
+                            + "longitude=" + latLng.getLongitude() + "&"
+                            + "gps_enabled=" + gpsEnabled;
 
                     Log.d(TAG, urlPost);
 
@@ -136,10 +151,8 @@ public class GeoGetService extends Service {
                     if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
                         Log.d(TAG, "" + connection.getResponseCode());
                     }
-                } catch (MalformedURLException e) {
-                    restartApp();
-                    e.printStackTrace();
-                } catch (IOException e) {
+                } catch (Exception e) {
+                    timer.cancel();
                     restartApp();
                     e.printStackTrace();
                 } finally {
@@ -147,7 +160,7 @@ public class GeoGetService extends Service {
                         connection.disconnect();
                 }
             }
-        }, 0, 10000);
+        }, 0, delaySendQuery);
     }
 
 }
